@@ -72,7 +72,6 @@ def k_means(data, k, max_iterations=100):
 
 
 # Example data points (2D points)
-# Example data points (2D points)
 data_points = [[1, 2], [1, 3], [2, 2], [8, 8], [9, 9], [10, 8]]
 
 # Number of clusters
