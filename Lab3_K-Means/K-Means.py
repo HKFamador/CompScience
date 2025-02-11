@@ -1,110 +1,92 @@
-# Function to calculate Hamming distance for categorical data
-def hamming_distance(point1, point2):
-    distance = 0
-    for i in range(len(point1) - 1):  # Exclude class label
-        if point1[i] != point2[i]:  # Count mismatches
-            distance += 1
-    return distance
+# Step 1: Initialize the centroids randomly (without using random or math packages)
+def initialize_centroids(data, k):
+    centroids = []
+    data_copy = data[:]
+    for i in range(k):
+        index = i % len(data_copy)  # Pick centroids in a round-robin fashion if there is no random
+        centroids.append(data_copy[index])
+    return centroids
 
 
-# Function to find k nearest neighbors
-def get_neighbors(training_data, test_instance, k):
-    distances = []
-    for train_instance in training_data:
-        dist = hamming_distance(train_instance, test_instance)  # Compute Hamming distance
-        distances.append((train_instance, dist))
-    distances.sort(key=lambda x: x[1])  # Sort by distance (ascending)
-    neighbors = [distances[i][0] for i in range(k)]  # Select k closest neighbors
-    return neighbors
+# Step 2: Assign each data point to the nearest centroid
+def assign_clusters(data, centroids):
+    clusters = [[] for _ in range(len(centroids))]
+
+    for point in data:
+        distances = [euclidean_distance(point, centroid) for centroid in centroids]
+        closest_centroid_index = min(range(len(distances)), key=distances.__getitem__)
+        clusters[closest_centroid_index].append(point)
+
+    return clusters
 
 
-# Function to predict class based on majority voting
-def predict_classification(training_data, test_instance, k):
-    neighbors = get_neighbors(training_data, test_instance, k)
-    class_votes = {}
-
-    for neighbor in neighbors:
-        label = neighbor[-1]  # Extract class label
-        if label in class_votes:
-            class_votes[label] += 1
-        else:
-            class_votes[label] = 1
-
-    # Find the class with the highest vote
-    max_vote = None
-    max_count = 0
-    for key in class_votes:
-        if class_votes[key] > max_count:
-            max_count = class_votes[key]
-            max_vote = key
-
-    return max_vote  # Return most common class
+# Step 3: Calculate the Euclidean distance between two points (manually)
+def euclidean_distance(point1, point2):
+    sum_squared_diffs = 0
+    for i in range(len(point1)):
+        sum_squared_diffs += (point1[i] - point2[i]) ** 2
+    return sum_squared_diffs ** 0.5
 
 
-# Dataset with full names for color, size, and brand
-dataset = [
-    ["Red", "Small", "BrandX", "Class1"],
-    ["Blue", "Medium", "BrandY", "Class2"],
-    ["Green", "Large", "BrandZ", "Class1"],
-    ["Red", "Medium", "BrandX", "Class1"],
-    ["Blue", "Small", "BrandY", "Class2"],
-    ["Yellow", "Small", "BrandZ", "Class1"],
-    ["Red", "Large", "BrandX", "Class1"],
-    ["Blue", "Large", "BrandY", "Class2"],
-    ["Green", "Medium", "BrandZ", "Class1"],
-    ["Yellow", "Medium", "BrandY", "Class2"],
-    ["Red", "Small", "BrandY", "Class2"],
-    ["Green", "Small", "BrandX", "Class1"],
-    ["Blue", "Medium", "BrandZ", "Class2"],
-    ["Yellow", "Large", "BrandX", "Class1"]
-]
+# Step 4: Recalculate centroids
+def update_centroids(clusters):
+    centroids = []
 
-# Mapping from short user input to full dataset values
-color_map = {'r': 'Red', 'b': 'Blue', 'g': 'Green', 'y': 'Yellow'}
-size_map = {'s': 'Small', 'm': 'Medium', 'l': 'Large'}
-brand_map = {'x': 'BrandX', 'y': 'BrandY', 'z': 'BrandZ'}
+    for cluster in clusters:
+        new_centroid = []
+        for i in range(len(cluster[0])):  # assuming all points have the same number of dimensions
+            dimension_values = [point[i] for point in cluster]
+            new_centroid.append(sum(dimension_values) / len(cluster))
+        centroids.append(new_centroid)
+
+    return centroids
 
 
-# Function to prompt user for input and predict class
-def main():
-    k = 3  # Number of neighbors
-    print("Let's predict the product's class based on its details. Please provide the following information:")
-    while True:
-        print("\nEnter the details of the new product:")
+# Step 5: Check if centroids have changed
+def has_converged(old_centroids, new_centroids, tolerance=1e-4):
+    for old, new in zip(old_centroids, new_centroids):
+        diff = euclidean_distance(old, new)
+        if diff > tolerance:
+            return False
+    return True
 
-        # Color input with validation
-        color = input("Color (r = Red, b = Blue, g = Green, y = Yellow): ").lower()
-        while color not in color_map:
-            print("Invalid input. Please enter 'r', 'b', 'g', or 'y'.")
-            color = input("Color (r = Red, b = Blue, g = Green, y = Yellow): ").lower()
 
-        # Size input with validation
-        size = input("Size (s = Small, m = Medium, l = Large): ").lower()
-        while size not in size_map:
-            print("Invalid input. Please enter 's', 'm', or 'l'.")
-            size = input("Size (s = Small, m = Medium, l = Large): ").lower()
+# K-means clustering function
+def k_means(data, k, max_iterations=100):
+    centroids = initialize_centroids(data, k)
+    for iteration in range(max_iterations):
+        # Assign points to the nearest centroid
+        clusters = assign_clusters(data, centroids)
 
-        # Brand input with validation
-        brand = input("Brand (x = BrandX, y = BrandY, z = BrandZ): ").lower()
-        while brand not in brand_map:
-            print("Invalid input. Please enter 'x', 'y', or 'z'.")
-            brand = input("Brand (x = BrandX, y = BrandY, z = BrandZ): ").lower()
+        # Save the old centroids to check for convergence later
+        old_centroids = centroids[:]
 
-        # Convert the short input to the full values
-        full_color = color_map[color]
-        full_size = size_map[size]
-        full_brand = brand_map[brand]
+        # Update centroids
+        centroids = update_centroids(clusters)
 
-        # Create the test instance with full values
-        test_point = [full_color, full_size, full_brand]
-        predicted_class = predict_classification(dataset, test_point, k)
-        print(f"Predicted class for {test_point}: {predicted_class}")
-
-        more_predictions = input("\nDo you want to predict another one? (yes/no): ").strip().lower()
-        if more_predictions != 'yes':
-            print("Goodbye!")
+        # If centroids have converged, stop the algorithm
+        if has_converged(old_centroids, centroids):
+            print(f"Converged after {iteration + 1} iterations.")
             break
+    return centroids, clusters
 
 
-# Run the program
-main()
+# Example data points (2D points)
+# Example data points (2D points)
+data_points = [[1, 2], [1, 3], [2, 2], [8, 8], [9, 9], [10, 8]]
+
+# Number of clusters
+k = 3
+
+# Running the K-means algorithm
+centroids, clusters = k_means(data_points, k)
+
+# Output the results
+print("\nFinal Centroids:")
+for centroid in centroids:
+    print(centroid)
+
+print("\nClusters:")
+for i, cluster in enumerate(clusters):
+    print(f"Cluster {i + 1}: {cluster}")
+
